@@ -5,7 +5,6 @@ import rospy
 from sensor_msgs.msg import Image, JointState
 from simple_arm.srv import *
 
-
 class LookAway(object):
     def __init__(self):
         rospy.init_node('look_away')
