@@ -93,7 +93,7 @@ class DBWNode(object):
     def dbw_enabled_cb(self, msg):
         self.dbw_enabled = msg
 
-    def twist_cb(self.msg):
+    def twist_cb(self, msg):
         self.linear_vel = msg.twist.linear.x
         self.angular_vel = msg.twist.angular.z
 

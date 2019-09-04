@@ -32,16 +32,20 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
+        self.base_lane = None
+        self.pose = None
+        self.waypoints_2d = None
+        self.waypoint_tree = None
+
+        self.stopline_wp_idx = -1
+
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('./traffic_waypoint', Int32, self.traffic_cb)
         ## there is no /obstacle_waypoint topic
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
-
-        # TODO: Add other member variables you need below
 
         self.loop() # a loop is used here to set the update frequency
 
@@ -76,11 +80,11 @@ class WaypointUpdater(object):
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
         return closest_idx
 
-    def publish_waypoints(self):
+    def publish_waypoints(self, closest_idx):
         lane = Lane()           #Lane() is a msg
-        lane.header = self.base_waypoints.header
+        lane.header = self.base_lane.header
         # if [a, b] b is longer than the length of list, automatically the final item
-        lane.waypoints = self.base_waypoints.waypoints[closest_idx : closest_idx + LOOKAHEAD_WPS]
+        lane.waypoints = self.base_lane.waypoints[closest_idx : closest_idx + LOOKAHEAD_WPS]
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
@@ -97,7 +101,7 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.stopline_wp_idx = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
