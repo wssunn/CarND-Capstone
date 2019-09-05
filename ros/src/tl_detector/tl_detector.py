@@ -11,6 +11,10 @@ import tf
 import cv2
 import yaml
 
+from scipy.spatial import KDTree
+import math
+import numpy as np
+
 STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
@@ -21,6 +25,19 @@ class TLDetector(object):
         self.waypoints = None
         self.camera_image = None
         self.lights = []
+
+        # waypoint KD Tree
+        self.waypoints_2d = None
+        self.waypoint_tree = None
+
+        self.bridge = CvBridge()
+        self.light_classifier = TLClassifier()
+        self.listener = tf.TransformListener()
+
+        self.state = TrafficLight.UNKNOWN
+        self.last_state = TrafficLight.UNKNOWN
+        self.last_wp = -1
+        self.state_count = 0
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -39,15 +56,6 @@ class TLDetector(object):
         self.config = yaml.load(config_string)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
-
-        self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
-        self.listener = tf.TransformListener()
-
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
-        self.last_wp = -1
-        self.state_count = 0
 
         rospy.spin()
 
