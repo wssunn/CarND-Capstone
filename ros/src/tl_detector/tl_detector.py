@@ -141,8 +141,6 @@ class TLDetector(object):
         # return light_state
 
         # for testing
-        rospy.logdebug("traffic light state: %d", light.state)
-        rospy.logwarn("traffic light state: %d", light.state)
         return light.state
 
     def process_traffic_lights(self):
