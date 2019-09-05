@@ -81,11 +81,51 @@ class WaypointUpdater(object):
         return closest_idx
 
     def publish_waypoints(self, closest_idx):
-        lane = Lane()           #Lane() is a msg
-        lane.header = self.base_lane.header
-        # if [a, b] b is longer than the length of list, automatically the final item
-        lane.waypoints = self.base_lane.waypoints[closest_idx : closest_idx + LOOKAHEAD_WPS]
-        self.final_waypoints_pub.publish(lane)
+        ##### without decelerating
+        # lane = Lane()           #Lane() is a msg
+        # lane.header = self.base_lane.header
+        # # if [a, b] b is longer than the length of list, automatically the final item
+        # lane.waypoints = self.base_lane.waypoints[closest_idx : closest_idx + LOOKAHEAD_WPS]
+        # self.final_waypoints_pub.publish(lane)
+
+        final_lane = self.generate_lane()
+        self.final_waypoints_pub.publish(final_lane)
+
+    def generate_lane(self):
+        lane = Lane()
+
+        closest_idx = self.get_closest_waypoint_idx()
+        farthest_idx = closest_idx + LOOKAHEAD_WPS
+        base_waypoints = self.base_lane.waypoints[closest_idx, farthest_idx]
+
+        # if the stop line is too far away, use base_waypoints
+        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
+            lane.waypoints = base_waypoints
+
+        #Otherwise set up the decel waypoints
+        else:
+            lane.waypoints = self.decelerate_waypoints(base_waypoints, closest_idx)
+
+        return lane
+
+    def decelerate_waypoints(self, waypoints, closest_idx):
+        temp_waypoints = []
+        for i, wp in enumerate(waypoints):
+            p = Waypoint()
+            p.pose = wp.pose
+
+            # -2 because want the car to stop before the stopline
+            stop_idx = max(self.stopline_wp_idx - closest_idx - 2, 0)
+            dist_to_stop = self.distance(waypoints, i, stop_idx)
+            decel_vel = math.sqrt(2 * MAX_DECEL * dist_to_stop)
+            if decel_vel < 1.0:
+                decel_vel = 0.0
+
+            # only use decel_vel if decel_vel < current velocity
+            p.twist.twist.linear.x = min(decel_vel, wp.twist.twist.linear.x)
+            temp_waypoints.append(p)
+
+        return temp_waypoints
 
     def pose_cb(self, msg):
         self.pose = msg
