@@ -21,9 +21,13 @@ class TLClassifier(object):
                         4: TrafficLight.UNKNOWN}
         self.image_counter = 0
         self.detection_graph = tf.Graph()
-        #model_path = self.get_model_path()
-        model_path =  "light_classification/frozen_inference_graph.pb"
+        model_path = self.get_model_path()
         self.load_model(model_path, self.detection_graph)
+
+    def get_model_path(self):
+        config_string = rospy.get_param("/traffic_light_config")
+        config = yaml.load(config_string)
+        return os.path.dirname(os.path.realpath(__file__)) + config['detection_model']
 
     def load_model(self, model_path, graph):
         with graph.as_default():
