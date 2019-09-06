@@ -42,7 +42,7 @@ class TLDetector(object):
         # only run light classfication on every 5th frame
         self.prev_light_state = None
         self.light_classifier_counter = 0
-        self.light_classifier_skip = 5
+        self.light_classifier_skip = 10
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -143,12 +143,11 @@ class TLDetector(object):
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
             # Get classification
             light_state = self.light_classifier.get_classification(cv_image)
-
-            rospy.logwarn("actual light state: %d", light.state)
-            rospy.logwarn("predicted light state: %d", light_state)
-            
             self.prev_light_state = light_state
             self.light_classifier_counter += 1
+
+            # rospy.logwarn("actual light state: %d", light.state)
+            # rospy.logwarn("predicted light state: %d", light_state)
 
         else:
             light_state = self.prev_light_state
