@@ -6,52 +6,85 @@ import rospy
 import yaml
 import cv2
 
+
+IMAGE_PATH = os.path.dirname(os.path.realpath(__file__)) + '/../../../../test_images/simulator/'
+MAX_IMAGE_WIDTH = 300
+MAX_IMAGE_HEIGHT = 300
+
 class TLClassifier(object):
     def __init__(self):
         #TODO load classifier
-        # is_simulation = True
-        # if is_simulation:
-        #     file_name = "light_classification/frozen_inference_graph.pb"
-        # else:
-        #     file_name = "light_classification/real_graph.pb"
-        file_name = "light_classification/frozen_inference_graph.pb"
+        self.detection_graph = None
+        self.classes = {1: TrafficLight.RED,
+                        2: TrafficLight.YELLOW,
+                        3: TrafficLight.GREEN,
+                        4: TrafficLight.UNKNOWN}
+        self.image_counter = 0
         self.detection_graph = tf.Graph()
-        with self.detection_graph.as_default():
+        #model_path = self.get_model_path()
+        model_path =  "light_classification/frozen_inference_graph.pb"
+        self.load_model(model_path, self.detection_graph)
+
+    def load_model(self, model_path, graph):
+        with graph.as_default():
             od_graph_def = tf.GraphDef()
-            with tf.gfile.GFile(file_name, 'rb') as fid:
+            with tf.gfile.GFile(model_path, 'rb') as fid:
                 serialized_graph = fid.read()
                 od_graph_def.ParseFromString(serialized_graph)
                 tf.import_graph_def(od_graph_def, name='')
 
-        self.sess = tf.Session(graph=self.detection_graph)
-        self.image_tensor = self.detection_graph.get_tensor_by_name('image_tensor:0')
-        self.detection_boxes = self.detection_graph.get_tensor_by_name('detection_boxes:0')
-        self.detection_scores = self.detection_graph.get_tensor_by_name('detection_scores:0')
-        self.detection_classes = self.detection_graph.get_tensor_by_name('detection_classes:0')
-        self.num_detections = self.detection_graph.get_tensor_by_name('num_detections:0')
-
     def get_classification(self, image):
         """Determines the color of the traffic light in the image
+
         Args:
             image (cv::Mat): image containing the traffic light
+
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
+
         """
         #TODO implement light color prediction
+        image = self.process_image(image)
+        light_class, probability = self.predict(image)
+
+        # rospy.logdebug("class: %d, probability: %f", light_class, probability)
+
+        return light_class
+
+    def process_image(self, image):
+        image = cv2.resize(image, (MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image_expanded = np.expand_dims(image, axis=0)
+        return image
 
-        # Actual detection.
-        (boxes, scores, classes, num) = self.sess.run(
-                                    [self.detection_boxes, self.detection_scores, self.detection_classes, self.num_detections],
-                                    feed_dict={self.image_tensor: image_expanded})
+    def predict(self, image, min_score_thresh=0.5):
 
-        if scores[0][0] > 0.5:
-            if classes[0][0] == 1:
-                return TrafficLight.GREEN
-            elif classes[0][0] == 2:
-                return TrafficLight.RED
-            elif classes[0][0] == 3:
-                return TrafficLight.YELLOW
+        boxes, scores, classes = self.run_inference(image, self.detection_graph)
 
-        return TrafficLight.UNKNOWN
+        for i, box in enumerate(boxes):
+            if scores[i] > min_score_thresh:
+                light_class = self.classes[classes[i]]
+                rospy.logdebug("Traffic light detected: %d, %d" , classes[i], light_class)
+                return light_class, scores[i]
+
+        return None, None
+
+    def run_inference(self, image, graph):
+        with graph.as_default():
+            config = tf.ConfigProto()
+            config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+            with tf.Session(graph=self.detection_graph, config=config) as sess:
+
+                image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0')
+                detection_boxes = tf.get_default_graph().get_tensor_by_name('detection_boxes:0')
+                detection_scores = tf.get_default_graph().get_tensor_by_name('detection_scores:0')
+                detection_classes = tf.get_default_graph().get_tensor_by_name('detection_classes:0')
+
+                (boxes, scores, classes) = sess.run(
+                    [detection_boxes, detection_scores, detection_classes],
+                    feed_dict={image_tensor: np.expand_dims(image, axis=0)})
+
+                scores = np.squeeze(scores)
+                classes = np.squeeze(classes)
+                boxes = np.squeeze(boxes)
+
+        return boxes, scores, classes
