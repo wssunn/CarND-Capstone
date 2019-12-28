@@ -41,7 +41,6 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         ## there is no /obstacle_waypoint topic
 
@@ -101,7 +100,7 @@ class WaypointUpdater(object):
         base_waypoints = self.base_lane.waypoints[closest_idx : farthest_idx]
 
         # if the stop line is too far away, use base_waypoints
-        if self.stopline_wp_idx == -1 or (self.stopline_wp_idx >= farthest_idx):
+        if (self.stopline_wp_idx == -1) or (self.stopline_wp_idx >= farthest_idx):
             lane.waypoints = base_waypoints
 
         #Otherwise set up the decel waypoints
